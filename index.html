@@ -734,7 +734,7 @@
       let storageIdx = 0;
       for (let rowIdx = 0; rowIdx < rowDefs.length; rowIdx++) {
         const row = rowDefs[rowIdx];
-        const iconTop = absY + useOffsetY + (rowIdx * rowStep) - iconSize;
+        const iconTop = absY + useOffsetY + (rowIdx * rowStep) - 14;
         const numY = absY + useOffsetY + (rowIdx * rowStep);
         for (let slot = 0; slot < row.slots; slot++) {
           const idx = storageIdx + slot;
@@ -742,7 +742,7 @@
           const mat = STORAGE_ORDER[idx];
           if (!mat) continue;
           const iconX = absX + offsetX + (slot * horizStep);
-          alt1.overLayRect(A1lib.mixColor(80,180,255), iconX, iconTop, iconSize, iconSize, 8000, 2);
+          alt1.overLayRect(A1lib.mixColor(80,180,255), iconX, iconTop, iconSize, iconSize, + 14, 8000, 2);
           if (idx >= startIdx && idx <= endIdx) {
             alt1.overLayRect(A1lib.mixColor(0,255,0), iconX - 2, numY - 2, 64, 14, 8000, 2);
           }
