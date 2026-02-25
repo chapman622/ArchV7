@@ -815,7 +815,7 @@
         console.log(`Bright count at (${x}, ${y}): ${brightCount}`);
 
         if (brightCount > 4) {
-          const estimate = Math.round(brightCount * 10 + 400);
+          const estimate = Math.round(brightCount * 9 + 300);
           console.log(`Estimating non-zero: ${estimate} (from ${brightCount} pixels)`);
           return estimate;
         }
