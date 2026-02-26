@@ -398,176 +398,111 @@ document.getElementById("t-preview-top").addEventListener("click",function(){pre
 document.getElementById("t-preview-bot").addEventListener("click",function(){previewBoxes(20,39,offsetY2);});
 
 // ── v1's proven OCR engine: large capture area + rich color palette + brightness fallback ──
-function readNumberAt(x,y){
-  try{
-    // Capture the number area - numbers sit just above y, span ~44px wide, ~12px tall
-    const W=44, H=14;
-    const cap=A1lib.capture(x, y-12, W, H);
-    if(!cap||!cap.data)return null;
-    const data=cap.data;
-    const w=cap.width, h=cap.height;
+function readNumberAt(x, y) {
+  try {
+    const W = 44, H = 12;
+    const cap = A1lib.capture(x, y - 10, W, H);
+    if (!cap || !cap.data) return null;
+    const data = cap.data;
+    const w = cap.width, h = cap.height;
 
-    // RS3 quantity numbers are golden/yellow: high R, medium-high G, low B
-    // Also handle white (for large numbers) and near-white
-    function isNumberPixel(r,g,b){
-      // Gold/yellow number text
-      if(r>180 && g>100 && b<120 && r>g+15) return true;
-      // White/bright number text  
-      if(r>200 && g>200 && b>200) return true;
-      return false;
-    }
-
-    // Build column occupancy map
-    const colHasPixel=[];
-    for(let px=0;px<w;px++){
-      let found=false;
-      for(let py=0;py<h;py++){
-        const i=(py*w+px)*4;
-        if(isNumberPixel(data[i],data[i+1],data[i+2])){found=true;break;}
-      }
-      colHasPixel.push(found);
-    }
-
-    // Group into segments separated by gaps of 2+ empty columns
-    const segs=[];
-    let inSeg=false,segStart=0;
-    for(let px=0;px<w;px++){
-      if(colHasPixel[px]&&!inSeg){inSeg=true;segStart=px;}
-      else if(!colHasPixel[px]&&inSeg){
-        // Check if gap is real (2+ cols) or noise (1 col)
-        if(px+1<w&&colHasPixel[px+1]){continue;} // 1-col gap, skip
-        segs.push({s:segStart,e:px-1,w:px-segStart});
-        inSeg=false;
-      }
-    }
-    if(inSeg)segs.push({s:segStart,e:w-1,w:w-segStart});
-
-    if(!segs.length)return 0;
-
-    // Count pixels per segment to classify digit
-    function segPixels(seg){
-      let count=0;
-      for(let px=seg.s;px<=seg.e;px++){
-        for(let py=0;py<h;py++){
-          const i=(py*w+px)*4;
-          if(isNumberPixel(data[i],data[i+1],data[i+2]))count++;
+    // Find columns that have gold/yellow pixels (RS3 number colour)
+    const cols = [];
+    for (let px = 0; px < w; px++) {
+      let hasGold = false;
+      for (let py = 0; py < h; py++) {
+        const i = (py * w + px) * 4;
+        const r = data[i], g = data[i+1], b = data[i+2];
+        // Gold text: high red, medium-high green, low blue
+        if (r > 180 && g > 120 && b < 100 && r > g + 20) {
+          hasGold = true;
+          break;
         }
       }
-      return count;
+      cols.push(hasGold);
     }
 
-    // For each segment get column pixel counts (profile)
-    function segProfile(seg){
-      const prof=[];
-      for(let px=seg.s;px<=seg.e;px++){
-        let count=0;
-        for(let py=0;py<h;py++){
-          const i=(py*w+px)*4;
-          if(isNumberPixel(data[i],data[i+1],data[i+2]))count++;
+    // Group consecutive gold columns into segments (digits)
+    const segments = [];
+    let inSeg = false, segStart = 0;
+    for (let px = 0; px < w; px++) {
+      if (cols[px] && !inSeg) { inSeg = true; segStart = px; }
+      else if (!cols[px] && inSeg) { 
+        segments.push({start: segStart, width: px - segStart});
+        inSeg = false; 
+      }
+    }
+    if (inSeg) segments.push({start: segStart, width: w - segStart});
+
+    if (!segments.length) return 0;
+
+    // For each segment, extract pixel pattern and classify digit
+    let numStr = "";
+    for (const seg of segments) {
+      if (seg.width < 2) continue; // skip noise
+      
+      // Build column density profile for this segment
+      const profile = [];
+      for (let px = seg.start; px < seg.start + seg.width; px++) {
+        let count = 0;
+        for (let py = 0; py < h; py++) {
+          const i = (py * w + px) * 4;
+          const r = data[i], g = data[i+1], b = data[i+2];
+          if (r > 180 && g > 120 && b < 100 && r > g + 20) count++;
         }
-        prof.push(count);
+        profile.push(count);
       }
-      return prof;
-    }
+      
+      const totalPx = profile.reduce((a,b) => a+b, 0);
+      const sw = seg.width;
+      const density = totalPx / (sw * h);
+      const midDensity = profile.slice(Math.floor(sw*0.3), Math.ceil(sw*0.7))
+        .reduce((a,b)=>a+b,0) / (Math.max(1, Math.ceil(sw*0.4)) * h);
+      const leftDensity = profile.slice(0, Math.ceil(sw/2)).reduce((a,b)=>a+b,0);
+      const rightDensity = profile.slice(Math.floor(sw/2)).reduce((a,b)=>a+b,0);
 
-    let numStr="";
-    for(const seg of segs){
-      if(seg.w<2)continue; // skip single-pixel noise
+      // Comma separator - very narrow, skip it
+      if (sw <= 3) { continue; }
 
-      const sw=seg.w;
-      const prof=segProfile(seg);
-      const total=prof.reduce((a,b)=>a+b,0);
-      const density=total/(sw*h);
-
-      // Comma: very narrow and sparse
-      if(sw<=3&&density<0.3){continue;}
-
-      const mid=prof.slice(Math.floor(sw*0.25),Math.ceil(sw*0.75));
-      const midDensity=mid.reduce((a,b)=>a+b,0)/(mid.length*h);
-      const leftHalf=prof.slice(0,Math.ceil(sw/2));
-      const rightHalf=prof.slice(Math.floor(sw/2));
-      const leftSum=leftHalf.reduce((a,b)=>a+b,0);
-      const rightSum=rightHalf.reduce((a,b)=>a+b,0);
-
-      // Top and bottom row density
-      let topCount=0,botCount=0;
-      for(let px=seg.s;px<=seg.e;px++){
-        const ti=(0*w+px)*4;
-        const bi=((h-1)*w+px)*4;
-        if(isNumberPixel(data[ti],data[ti+1],data[ti+2]))topCount++;
-        if(isNumberPixel(data[bi],data[bi+1],data[bi+2]))botCount++;
-      }
-      const topDen=topCount/sw;
-      const botDen=botCount/sw;
-
-      let digit="?";
-
-      if(sw<=4){
-        // Narrow: likely 1
-        digit="1";
-      } else if(midDensity<0.12&&density<0.4){
-        // Hollow middle = 0
-        digit="0";
-      } else if(topDen>0.6&&botDen>0.6&&density>0.5){
-        // Dense top and bottom = 8
-        digit="8";
-      } else if(topDen>0.7&&botDen<0.3){
-        // Dense top, empty bottom = 7
-        digit="7";
-      } else if(botDen>0.7&&topDen<0.3){
-        // Dense bottom, empty top = could be 2
-        digit="2";
-      } else if(leftSum>rightSum*1.5&&botDen>0.5){
-        // Left heavy, dense bottom = 5
-        digit="5";
-      } else if(rightSum>leftSum*1.5){
-        // Right heavy = 4 or 9
-        digit=midDensity>0.3?"9":"4";
-      } else if(leftSum>rightSum*1.2){
-        // Slightly left heavy = 6
-        digit="6";
-      } else if(density>0.45){
-        digit="3";
+      // Classify by width and density patterns
+      let digit = "?";
+      if (sw <= 5) {
+        // Narrow digits: 1
+        digit = "1";
+      } else if (midDensity < 0.15) {
+        // Hollow middle: 0
+        digit = "0";
+      } else if (density > 0.55) {
+        // Very dense: 8
+        digit = "8";
+      } else if (leftDensity > rightDensity * 1.4) {
+        digit = "4";
+      } else if (rightDensity > leftDensity * 1.3) {
+        digit = "7";
+      } else if (density > 0.38) {
+        digit = "6";
+      } else if (density > 0.30) {
+        digit = "9";
+      } else if (midDensity > 0.25) {
+        digit = "3";
+      } else if (leftDensity > rightDensity) {
+        digit = "5";
       } else {
-        digit="2";
+        digit = "2";
       }
-      numStr+=digit;
+      numStr += digit;
     }
 
-    // Try Alt1 OCR as well if font available, prefer it
-    if(OCR&&OCR.smallChars){
-      const colors=[
-        [255,255,255],[255,240,180],[255,230,150],[255,220,120],[255,210,100],
-        [255,200,80],[255,199,0],[255,215,0],[240,200,90],[230,180,70],
-        [245,225,130],[240,215,110],[235,190,80],[230,180,70],[225,170,60]
-      ];
-      try{
-        const bigCap=A1lib.capture(x-4,y-14,W+8,H+4);
-        if(bigCap){
-          let r=null;
-          if(OCR.readSmallChars)r=OCR.readSmallChars(bigCap,OCR.smallChars,colors);
-          else if(OCR.readLine)r=OCR.readLine(bigCap,OCR.smallChars,colors);
-          if(r&&r.text){
-            const n=parseInt(r.text.replace(/[^0-9]/g,""));
-            if(!isNaN(n)&&n>=0){
-              console.log(`OCR font read: "${r.text}" → ${n}`);
-              return n;
-            }
-          }
-        }
-      }catch(e){}
-    }
-
-    const n=parseInt(numStr);
-    console.log(`Pixel read x=${x} y=${y}: segs=${segs.length} str="${numStr}" n=${isNaN(n)?0:n}`);
-    return isNaN(n)?0:n;
-  }catch(e){
-    console.log("readNumberAt error:",e);
+    const n = parseInt(numStr);
+    console.log(`readNumberAt(${x},${y}): segments=${segments.length} str="${numStr}" n=${n}`);
+    return isNaN(n) ? null : n;
+  } catch(e) {
+    console.log("readNumberAt error:", e);
     return null;
   }
 }
 
-async function performScan(startIdx,endIdx,label,useOffsetY){
+    async function performScan(startIdx,endIdx,label,useOffsetY){
   const out=document.getElementById("ocr-out");
   if(!storedWinX||!storedWinY){out.textContent="Locate window first.";return;}
   const absX=storedWinX, absY=storedWinY;
