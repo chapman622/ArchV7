@@ -1323,6 +1323,7 @@
     window.addEventListener("load", function() {
       if (window.alt1) {
         A1lib.identifyApp("appconfig.json");
+        OCR.loadFont("smallChars").then(() => console.log("smallChars loaded!")).catch(e => console.log("smallChars load failed:", e));
         document.getElementById("alt1-badge").textContent = "Alt1 ✅";
         document.getElementById("alt1-badge").classList.add("ok");
         const sx = localStorage.getItem("archStorageWinX");
