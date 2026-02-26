@@ -185,12 +185,12 @@
     <div id="tuner-wrap" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px">
       <div style="font-size:9px;color:var(--accent);margin-bottom:4px">OFFSET TUNERS — adjust until green boxes align with quantity numbers</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:9px;color:var(--muted);margin-bottom:4px">
-        offX:<input class="tin" id="t-ox" type="number" value="18">
-        offY (top scan):<input class="tin" id="t-oy" type="number" value="68">
-        offY (bottom scan):<input class="tin" id="t-oy2" type="number" value="68">
-        step (horiz):<input class="tin" id="t-step" type="number" value="52">
+        offX:<input class="tin" id="t-ox" type="number" value="10">
+        offY (top scan):<input class="tin" id="t-oy" type="number" value="66">
+        offY (bottom scan):<input class="tin" id="t-oy2" type="number" value="78">
+        step (horiz):<input class="tin" id="t-step" type="number" value="46">
         row (vert):<input class="tin" id="t-row" type="number" value="70">
-        icon px:<input class="tin" id="t-icon" type="number" value="38">
+        icon px:<input class="tin" id="t-icon" type="number" value="42">
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn suc" id="t-rescan" style="font-size:9px;padding:2px 5px">&#9654; Re-Scan Top</button>
@@ -321,12 +321,12 @@ let storedWinHeight=parseInt(localStorage.getItem("archStorageWinHeight"))||342;
 // offsetY2 = px from window top to first number row (bottom scan = scrolled so Dragonkin is first row)
 // rowStep  = px between each row of culture icons (~68px for default RS3 UI scale)
 // horizStep= px between icon columns (~49px)
-let offsetX=18, offsetY=68, offsetY2=68, horizStep=52, rowStep=70, iconSize=38;
+let offsetX=10, offsetY=66, offsetY2=78, horizStep=46, rowStep=70, iconSize=42;
 
 function loadTuners(){
   const s=JSON.parse(localStorage.getItem("archOcrTuners")||"{}");
-  offsetX=s.offsetX??18; offsetY=s.offsetY??68; offsetY2=s.offsetY2??68;
-  horizStep=s.horizStep??52; rowStep=s.rowStep??70; iconSize=s.iconSize??38;
+  offsetX=s.offsetX??10; offsetY=s.offsetY??66; offsetY2=s.offsetY2??78;
+  horizStep=s.horizStep??46; rowStep=s.rowStep??70; iconSize=s.iconSize??42;
   document.getElementById("t-ox").value=offsetX;
   document.getElementById("t-oy").value=offsetY;
   document.getElementById("t-oy2").value=offsetY2;
@@ -340,7 +340,7 @@ function saveTuners(){
 // Wipe old tuner saves that used wrong defaults (v3 values)
 (function(){
   const s=JSON.parse(localStorage.getItem("archOcrTuners")||"{}");
-  if(s.horizStep&&s.horizStep<50){localStorage.removeItem("archOcrTuners");}
+  
 })();
 ["t-ox","t-oy","t-oy2","t-step","t-row","t-icon"].forEach(function(id){
   document.getElementById(id).addEventListener("input",function(e){
