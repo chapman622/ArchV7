@@ -1323,7 +1323,17 @@
     window.addEventListener("load", function() {
       if (window.alt1) {
         A1lib.identifyApp("appconfig.json");
-        console.log("OCR keys:", Object.keys(OCR));
+        fetch("https://www.unpkg.com/alt1/dist/ocr/fonts/osrs_small.png")
+  .then(r => r.blob())
+  .then(blob => {
+    const img = new Image();
+    img.onload = () => {
+      OCR.smallChars = OCR.generateFont(img);
+      console.log("Font generated:", !!OCR.smallChars);
+    };
+    img.src = URL.createObjectURL(blob);
+  })
+  .catch(e => console.log("Font load error:", e));
         document.getElementById("alt1-badge").textContent = "Alt1 ✅";
         document.getElementById("alt1-badge").classList.add("ok");
         const sx = localStorage.getItem("archStorageWinX");
